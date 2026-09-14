@@ -1,0 +1,71 @@
+:root {
+  color-scheme: light;
+  font-family: "Microsoft YaHei", system-ui, sans-serif;
+  background: #f4f8f4;
+  color: #17341f;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+}
+
+main {
+  padding: 18px;
+}
+
+.badge {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  float: left;
+  margin: 0 12px 10px 0;
+  border-radius: 13px;
+  background: #2f7f43;
+  color: white;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+h1 {
+  margin: 0;
+  padding-top: 2px;
+  font-size: 17px;
+}
+
+p {
+  clear: both;
+  margin: 15px 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.version {
+  clear: none;
+  margin: 4px 0 0;
+  color: #5e7464;
+  font-size: 12px;
+}
+
+button {
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: #2f7f43;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #256c38;
+}
+
+.note {
+  margin-bottom: 0;
+  color: #69796c;
+  font-size: 11px;
+}
