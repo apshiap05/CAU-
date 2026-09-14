@@ -10,7 +10,7 @@
 ## 选择版本
 
 | 版本 | 适合场景 |
-| --- | --- | --- |
+| --- | --- |
 | Chrome 扩展 v1.0.0 | 只使用 Google Chrome，希望不依赖 Tampermonkey |
 | Tampermonkey 脚本 v1.2.0 | 使用 Chrome、Edge、Firefox，或已经安装 Tampermonkey |
 
