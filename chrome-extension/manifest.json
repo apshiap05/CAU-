@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "minimum_chrome_version": "102",
   "description": "在已登录的中国农业大学选课页按条件刷新，发现余量后调用教务系统原生流程选课。",
+  "homepage_url": "https://github.com/apshiap05/CAU-",
   "permissions": [
     "notifications",
     "scripting",

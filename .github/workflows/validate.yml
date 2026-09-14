@@ -1,0 +1,33 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check chrome-extension/content.js
+          node --check chrome-extension/background.js
+          node --check chrome-extension/popup.js
+          node --check userscript/cau-course-watcher.user.js
+
+      - name: Parse Chrome manifest
+        run: node -e "JSON.parse(require('node:fs').readFileSync('chrome-extension/manifest.json', 'utf8'))"
+
+      - name: Run smoke test
+        run: node tests/background-smoke.test.cjs

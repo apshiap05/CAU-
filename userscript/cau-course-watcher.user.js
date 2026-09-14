@@ -3,7 +3,12 @@
 // @namespace    local.cau.course-watcher
 // @version      1.2.0
 // @description  在已登录的中国农业大学选课页按条件查询课程，发现余量后使用页面原生流程选课。
-// @author       Local
+// @author       apshiap05
+// @license      Apache-2.0
+// @homepageURL  https://github.com/apshiap05/CAU-
+// @supportURL   https://github.com/apshiap05/CAU-/issues
+// @downloadURL  https://raw.githubusercontent.com/apshiap05/CAU-/main/userscript/cau-course-watcher.user.js
+// @updateURL    https://raw.githubusercontent.com/apshiap05/CAU-/main/userscript/cau-course-watcher.user.js
 // @match        https://newjw.cau.edu.cn/jsxsd/xsxk/xsxk_index*
 // @run-at       document-idle
 // @noframes
