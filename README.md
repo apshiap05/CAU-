@@ -9,45 +9,28 @@
 
 ## 选择版本
 
-| 版本 | 适合场景 | 安装入口 |
+| 版本 | 适合场景 |
 | --- | --- | --- |
-| Chrome 扩展 v1.0.0 | 只使用 Google Chrome，希望不依赖 Tampermonkey | [`chrome-extension/`](./chrome-extension/) |
-| Tampermonkey 脚本 v1.2.0 | 使用 Chrome、Edge、Firefox，或已经安装 Tampermonkey | [`userscript/cau-course-watcher.user.js`](./userscript/cau-course-watcher.user.js) |
+| Chrome 扩展 v1.0.0 | 只使用 Google Chrome，希望不依赖 Tampermonkey |
+| Tampermonkey 脚本 v1.2.0 | 使用 Chrome、Edge、Firefox，或已经安装 Tampermonkey |
 
-两个版本具备相同的核心能力：
+两个版本具备相同的核心能力。
 
-- 按课程名自动填写并重复点击教务系统“查询”。
-- 可按课程编号、教师、课序号、校区和时间关键词进一步过滤。
-- 解析选课人数、限选人数和剩余容量。
-- 多个班级同时有余量时，可选择页面第一班或余量最多的班。
-- 发现余量后只提交一次，并调用页面原生 `xsxkFun(...)` 流程。
-- 自动处理本次选课流程中的连续确认框，包括“确认选择当前课程班级”和后续课程组确认。
-- 成功、验证码、会话失效、网络异常或结果不确定时，通过面板日志、提示音和桌面通知反馈。
-- `Esc` 紧急停止、错误退避、最大查询次数和最低三秒间隔。
 
-## 快速安装
+## 安装
 
 ### Google Chrome 扩展
 
-1. 下载仓库源码：点击 GitHub 页面右上方 `Code` → `Download ZIP`，然后完整解压。
-2. 在 Chrome 地址栏打开 `chrome://extensions/`。
-3. 打开右上角“开发者模式”。
-4. 点击“加载已解压的扩展程序”。
-5. 选择解压后包含 [`chrome-extension/manifest.json`](./chrome-extension/manifest.json) 的 `chrome-extension` 文件夹。
-6. 登录教务系统并刷新选课页面，页面右侧会出现配置面板。
+使用“加载已解压的扩展程序”或直接使用releases中的压缩包。
 
-详细说明见 [Chrome 扩展文档](./chrome-extension/README.md)。
-
-### Tampermonkey 用户脚本
+### Tampermonkey 脚本
 
 1. 从浏览器官方扩展商店安装 Tampermonkey。
 2. 打开 [用户脚本源码](./userscript/cau-course-watcher.user.js)，复制全部内容。
 3. 在 Tampermonkey 中选择“添加新脚本”，替换示例内容并保存。
 4. 登录教务系统并刷新选课页面。
 
-也可以打开 [Raw 用户脚本](https://raw.githubusercontent.com/apshiap05/CAU-/main/userscript/cau-course-watcher.user.js) 交给 Tampermonkey 识别安装。详细说明见 [用户脚本文档](./userscript/README.md)。
-
-## 推荐使用流程
+## 使用流程
 
 1. 输入完整课程名称。同名课程较多时，再填写教师、课序号或时间关键词。
 2. 先点击“仅查询一次”，确认匹配班级正确；该按钮不会选课。
@@ -56,7 +39,7 @@
 5. 点击“开始监控”。发现符合最低余量的班级后，程序只尝试提交一次。
 6. 成功后到“选课结果查看及退选”或课表中再次确认。
 
-建议使用默认的 5 秒查询间隔和随机抖动。更短的间隔并不保证更容易成功，反而可能触发服务器限流、会话异常或账号保护。
+建议使用10s左右的查询间隔和随机抖动。更短的间隔并不保证更容易成功，反而可能触发服务器限流、会话异常或账号保护（别问我咋知道的）。
 
 ## 连续确认框处理
 
@@ -68,7 +51,6 @@
 4. 调用结束或超时后恢复页面原始弹窗函数。
 5. 再到“选课结果查看及退选”区域验证是否真正选中。
 
-验证码、需要输入内容的窗口、自定义网页表单和时间冲突选择窗口不会被等价为“点击确定”；遇到这些情况程序会暂停并要求人工处理。
 
 ## 仓库结构
 
@@ -87,20 +69,6 @@
 ├─ LICENSE
 └─ README.md
 ```
-
-## 本地校验
-
-需要 Node.js 18 或更高版本：
-
-```powershell
-node --check chrome-extension/content.js
-node --check chrome-extension/background.js
-node --check chrome-extension/popup.js
-node --check userscript/cau-course-watcher.user.js
-node tests/background-smoke.test.cjs
-```
-
-冒烟测试只使用模拟课程行，检查连续两层确认框、异步结果提示以及弹窗函数恢复，不会访问教务系统或提交真实选课。
 
 ## 隐私与免责声明
 
