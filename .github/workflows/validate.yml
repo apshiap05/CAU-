@@ -33,4 +33,5 @@ jobs:
         run: |
           node tests/background-smoke.test.cjs
           node tests/multi-mode.test.cjs
+          node tests/panel-layout.test.cjs
           node tests/release-version.test.cjs

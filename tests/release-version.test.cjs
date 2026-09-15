@@ -15,6 +15,7 @@ const userscriptVersion = userscript.match(/^\/\/ @version\s+(\S+)$/m)?.[1];
 assert.ok(userscriptVersion, '找不到油猴脚本 @version');
 assert.equal(userscriptVersion, manifest.version, 'Chrome 与油猴脚本版本必须保持一致');
 assert.match(content, new RegExp(`Chrome v${manifest.version.replace(/\./g, '\\.')}`));
+assert.match(userscript, new RegExp(`>v${manifest.version.replace(/\./g, '\\.')}<\\/small>`));
 assert.match(popup, new RegExp(`Chrome 扩展 v${manifest.version.replace(/\./g, '\\.')}`));
 assert.match(changelog, new RegExp(`^## v${manifest.version.replace(/\./g, '\\.')}\\b`, 'm'));
 

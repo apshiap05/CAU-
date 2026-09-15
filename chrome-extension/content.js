@@ -193,7 +193,29 @@
         margin: 9px 0; padding: 10px; background: white; border: 1px solid #d9e8de; border-radius: 8px;
       }
       #${SCRIPT_ID}-panel .cau-cw-section-title { margin-bottom: 7px; font-weight: 700; color: #176f3b; }
-      #${SCRIPT_ID}-panel .cau-cw-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      #${SCRIPT_ID}-panel .cau-cw-section-heading {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        margin-bottom: 8px; padding: 1px 1px 8px; border-bottom: 1px solid #e3eee6;
+      }
+      #${SCRIPT_ID}-panel .cau-cw-section-heading .cau-cw-section-title { margin: 0; }
+      #${SCRIPT_ID}-panel .cau-cw-add-btn {
+        display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 5px;
+        min-width: 96px; height: 30px; padding: 0 13px 0 10px; border: 1px solid #8ebfa0;
+        border-radius: 999px; color: #176f3b; background: #edf6f0;
+        font: 650 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        cursor: pointer; transition: color .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+      }
+      #${SCRIPT_ID}-panel .cau-cw-add-btn .cau-cw-add-symbol {
+        font-size: 18px; font-weight: 500; line-height: 1; transform: translateY(-1px);
+      }
+      #${SCRIPT_ID}-panel .cau-cw-add-btn:hover:not(:disabled) {
+        color: white; background: #25824b; border-color: #25824b; box-shadow: 0 3px 9px rgba(37,130,75,.2);
+        transform: translateY(-1px);
+      }
+      #${SCRIPT_ID}-panel .cau-cw-add-btn:focus-visible {
+        outline: 0; box-shadow: 0 0 0 3px rgba(45,140,82,.2);
+      }
+      #${SCRIPT_ID}-panel .cau-cw-add-btn:disabled { opacity: .45; cursor: not-allowed; }
       #${SCRIPT_ID}-panel .cau-cw-course-block {
         margin-top: 8px; padding: 9px; background: #f7faf8; border: 1px solid #d4e4d9; border-radius: 8px;
       }
@@ -258,7 +280,7 @@
     panel.id = `${SCRIPT_ID}-panel`;
     panel.innerHTML = `
       <div class="cau-cw-header">
-        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.3.0</small></div>
+        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.3.1</small></div>
         <span id="cau-cw-run-state" class="cau-cw-paused">已停止</span>
         <button id="cau-cw-collapse" class="cau-cw-icon-btn" title="收起/展开">—</button>
       </div>
@@ -277,7 +299,9 @@
         <div class="cau-cw-section">
           <div class="cau-cw-section-heading">
             <div class="cau-cw-section-title">待选课程</div>
-            <button id="cau-cw-add-course" class="cau-cw-small-btn" type="button" title="增加待选课程">＋</button>
+            <button id="cau-cw-add-course" class="cau-cw-add-btn" type="button" title="增加待选课程" aria-label="增加待选课程">
+              <span class="cau-cw-add-symbol" aria-hidden="true">＋</span><span>添加课程</span>
+            </button>
           </div>
           <div id="cau-cw-course-list"></div>
           <p id="cau-cw-target-hint" class="cau-cw-hint"></p>
@@ -402,8 +426,12 @@
       tab.setAttribute('aria-selected', String(active));
       tab.disabled = state.running || state.inFlight;
     });
+    const courseLimitReached = blocks.length >= MAX_COURSES;
     ui.addCourse.hidden = mode !== 'multi';
-    ui.addCourse.disabled = state.running || state.inFlight || blocks.length >= MAX_COURSES;
+    ui.addCourse.disabled = state.running || state.inFlight || courseLimitReached;
+    const addCourseDescription = courseLimitReached ? `最多可配置 ${MAX_COURSES} 门课程` : '增加待选课程';
+    ui.addCourse.title = addCourseDescription;
+    ui.addCourse.setAttribute('aria-label', addCourseDescription);
     blocks.forEach((block, index) => {
       block.hidden = mode === 'normal' && index > 0;
       const remove = block.querySelector('[data-remove-course]');
