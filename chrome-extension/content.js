@@ -4,8 +4,9 @@
   const SCRIPT_ID = 'cau-course-watcher';
   const STORAGE_KEY = `${SCRIPT_ID}:chrome-config:v1`;
   const PAGE = window;
+  const MAX_COURSES = 4;
 
-  const DEFAULT_CONFIG = Object.freeze({
+  const DEFAULT_COURSE = Object.freeze({
     courseName: '',
     matchMode: 'exact',
     courseCode: '',
@@ -13,11 +14,16 @@
     classNumber: '',
     campus: '',
     timeKeyword: '',
+    minRemaining: 1,
+    selectionStrategy: 'maxRemaining',
+  });
+
+  const DEFAULT_CONFIG = Object.freeze({
+    mode: 'normal',
+    courses: Object.freeze([DEFAULT_COURSE]),
     intervalMs: 5000,
     jitterMs: 900,
-    minRemaining: 1,
     maxAttempts: 0,
-    selectionStrategy: 'maxRemaining',
     showFullCourses: true,
     autoConfirmAllPrompts: true,
     desktopNotification: true,
@@ -33,7 +39,9 @@
     nextRunAt: 0,
     consecutiveErrors: 0,
     transientFailures: 0,
-    config: { ...DEFAULT_CONFIG },
+    courseIndex: 0,
+    stopRequested: false,
+    config: sanitizeConfig(DEFAULT_CONFIG),
     audioContext: null,
     lastRows: [],
   };
@@ -44,9 +52,10 @@
     try {
       const stored = await chrome.storage.local.get(STORAGE_KEY);
       const saved = stored[STORAGE_KEY];
-      if (!saved) return { ...DEFAULT_CONFIG };
+      if (!saved) return sanitizeConfig(DEFAULT_CONFIG);
       const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
       const merged = { ...DEFAULT_CONFIG, ...parsed };
+      merged.courses = Array.isArray(parsed.courses) ? parsed.courses : [parsed];
       if (
         !Object.prototype.hasOwnProperty.call(parsed, 'autoConfirmAllPrompts') &&
         Object.prototype.hasOwnProperty.call(parsed, 'autoConfirmFirstPrompt')
@@ -56,7 +65,7 @@
       return sanitizeConfig(merged);
     } catch (error) {
       console.warn('[CAU Course Watcher] 无法读取配置，将使用默认值。', error);
-      return { ...DEFAULT_CONFIG };
+      return sanitizeConfig(DEFAULT_CONFIG);
     }
   }
 
@@ -73,24 +82,41 @@
       if (!Number.isFinite(parsed)) return fallback;
       return Math.min(max, Math.max(min, parsed));
     };
+    const sanitizeCourse = (course = {}) => ({
+      courseName: String(course.courseName || '').trim(),
+      matchMode: course.matchMode === 'contains' ? 'contains' : 'exact',
+      courseCode: String(course.courseCode || '').trim(),
+      teacher: String(course.teacher || '').trim(),
+      classNumber: String(course.classNumber || '').trim(),
+      campus: String(course.campus || '').trim(),
+      timeKeyword: String(course.timeKeyword || '').trim(),
+      minRemaining: number(course.minRemaining, DEFAULT_COURSE.minRemaining, 1, 9999),
+      selectionStrategy: course.selectionStrategy === 'first' ? 'first' : 'maxRemaining',
+    });
+    const rawCourses = Array.isArray(input.courses) ? input.courses : [input];
+    const courses = rawCourses.slice(0, MAX_COURSES).map(sanitizeCourse);
+    if (!courses.length) courses.push(sanitizeCourse(DEFAULT_COURSE));
     return {
-      courseName: String(input.courseName || '').trim(),
-      matchMode: input.matchMode === 'contains' ? 'contains' : 'exact',
-      courseCode: String(input.courseCode || '').trim(),
-      teacher: String(input.teacher || '').trim(),
-      classNumber: String(input.classNumber || '').trim(),
-      campus: String(input.campus || '').trim(),
-      timeKeyword: String(input.timeKeyword || '').trim(),
+      mode: input.mode === 'multi' ? 'multi' : 'normal',
+      courses,
       intervalMs: number(input.intervalMs, DEFAULT_CONFIG.intervalMs, 3000, 120000),
       jitterMs: number(input.jitterMs, DEFAULT_CONFIG.jitterMs, 0, 10000),
-      minRemaining: number(input.minRemaining, DEFAULT_CONFIG.minRemaining, 1, 9999),
       maxAttempts: number(input.maxAttempts, DEFAULT_CONFIG.maxAttempts, 0, 1000000),
-      selectionStrategy: input.selectionStrategy === 'first' ? 'first' : 'maxRemaining',
       showFullCourses: Boolean(input.showFullCourses),
       autoConfirmAllPrompts: Boolean(input.autoConfirmAllPrompts),
       desktopNotification: Boolean(input.desktopNotification),
       sound: Boolean(input.sound),
     };
+  }
+
+  function activeCourseConfigs(config) {
+    const courses = config.mode === 'multi' ? config.courses : config.courses.slice(0, 1);
+    return courses.map((course, targetIndex) => ({ ...config, ...course, targetIndex }));
+  }
+
+  function targetLabel(config) {
+    const total = activeCourseConfigs(state.config).length;
+    return total > 1 ? `课程 ${config.targetIndex + 1}/${total}“${config.courseName}”` : `“${config.courseName}”`;
   }
 
   function normalize(value) {
@@ -131,7 +157,7 @@
       #${SCRIPT_ID}-panel, #${SCRIPT_ID}-panel * { box-sizing: border-box; }
       #${SCRIPT_ID}-panel {
         position: fixed; top: 18px; right: 18px; z-index: 2147483646;
-        width: 390px; max-height: calc(100vh - 36px); overflow: auto;
+        width: 440px; max-height: calc(100vh - 36px); overflow: auto;
         color: #203129; background: #f8fbf9; border: 1px solid #9bc8aa;
         border-radius: 12px; box-shadow: 0 14px 40px rgba(13, 63, 34, .24);
         font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
@@ -148,6 +174,16 @@
         border: 1px solid rgba(255,255,255,.32); border-radius: 6px; cursor: pointer;
       }
       #${SCRIPT_ID}-panel .cau-cw-body { padding: 12px; }
+      #${SCRIPT_ID}-panel .cau-cw-tabs {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px;
+        padding: 4px; background: #e4eee7; border-radius: 9px;
+      }
+      #${SCRIPT_ID}-panel .cau-cw-mode-tab {
+        min-height: 34px; border: 0; border-radius: 7px; color: #45604d;
+        background: transparent; font-weight: 700; cursor: pointer;
+      }
+      #${SCRIPT_ID}-panel .cau-cw-mode-tab.active { color: white; background: #25824b; }
+      #${SCRIPT_ID}-panel .cau-cw-mode-tab:disabled { opacity: .58; cursor: not-allowed; }
       #${SCRIPT_ID}-panel .cau-cw-status {
         display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px;
         padding: 9px; background: #edf6f0; border-radius: 8px;
@@ -157,6 +193,19 @@
         margin: 9px 0; padding: 10px; background: white; border: 1px solid #d9e8de; border-radius: 8px;
       }
       #${SCRIPT_ID}-panel .cau-cw-section-title { margin-bottom: 7px; font-weight: 700; color: #176f3b; }
+      #${SCRIPT_ID}-panel .cau-cw-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      #${SCRIPT_ID}-panel .cau-cw-course-block {
+        margin-top: 8px; padding: 9px; background: #f7faf8; border: 1px solid #d4e4d9; border-radius: 8px;
+      }
+      #${SCRIPT_ID}-panel .cau-cw-course-block:first-child { margin-top: 0; }
+      #${SCRIPT_ID}-panel .cau-cw-course-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+      #${SCRIPT_ID}-panel .cau-cw-course-head b { color: #315e40; }
+      #${SCRIPT_ID}-panel .cau-cw-small-btn {
+        min-width: 30px; height: 28px; padding: 0 8px; border: 1px solid #9bc8aa;
+        border-radius: 6px; color: #176f3b; background: #edf6f0; font-size: 18px; line-height: 1; cursor: pointer;
+      }
+      #${SCRIPT_ID}-panel .cau-cw-small-btn.cau-cw-remove { color: #a3322a; border-color: #e1b6b1; background: #fff1ef; }
+      #${SCRIPT_ID}-panel .cau-cw-small-btn:disabled { opacity: .45; cursor: not-allowed; }
       #${SCRIPT_ID}-panel .cau-cw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       #${SCRIPT_ID}-panel label { display: block; color: #41574a; }
       #${SCRIPT_ID}-panel label > span { display: block; margin-bottom: 3px; }
@@ -209,11 +258,15 @@
     panel.id = `${SCRIPT_ID}-panel`;
     panel.innerHTML = `
       <div class="cau-cw-header">
-        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.0.0</small></div>
+        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.1.0</small></div>
         <span id="cau-cw-run-state" class="cau-cw-paused">已停止</span>
         <button id="cau-cw-collapse" class="cau-cw-icon-btn" title="收起/展开">—</button>
       </div>
       <div class="cau-cw-body">
+        <div class="cau-cw-tabs" role="tablist" aria-label="监控模式">
+          <button class="cau-cw-mode-tab" type="button" role="tab" data-mode="normal">正常模式</button>
+          <button class="cau-cw-mode-tab" type="button" role="tab" data-mode="multi">多选模式</button>
+        </div>
         <div class="cau-cw-status">
           <div>页面：<b id="cau-cw-page-state">检测中</b></div>
           <div>查询：<b id="cau-cw-attempts">0 次</b></div>
@@ -222,17 +275,12 @@
         </div>
 
         <div class="cau-cw-section">
-          <div class="cau-cw-section-title">目标课程</div>
-          <div class="cau-cw-grid">
-            <label style="grid-column: 1 / -1"><span>课程名称（必填）</span><input id="cau-cw-course-name" type="text" placeholder="例如：羽毛球"></label>
-            <label><span>名称匹配</span><select id="cau-cw-match-mode"><option value="exact">智能精确（推荐）</option><option value="contains">包含关键词</option></select></label>
-            <label><span>课程编号（可选）</span><input id="cau-cw-course-code" type="text" placeholder="例如：70013084"></label>
-            <label><span>教师（可选）</span><input id="cau-cw-teacher" type="text" placeholder="包含匹配"></label>
-            <label><span>课序号（可选）</span><input id="cau-cw-class-number" type="text" placeholder="例如：507"></label>
-            <label><span>校区（可选）</span><input id="cau-cw-campus" type="text" placeholder="例如：烟台研究院"></label>
-            <label><span>时间关键词（可选）</span><input id="cau-cw-time" type="text" placeholder="例如：星期六 1-2节"></label>
+          <div class="cau-cw-section-heading">
+            <div class="cau-cw-section-title">待选课程</div>
+            <button id="cau-cw-add-course" class="cau-cw-small-btn" type="button" title="增加待选课程">＋</button>
           </div>
-          <p class="cau-cw-hint">同名课程有多个班时，建议至少填写教师、课序号或时间；否则默认选择剩余容量最多的班。</p>
+          <div id="cau-cw-course-list"></div>
+          <p id="cau-cw-target-hint" class="cau-cw-hint"></p>
         </div>
 
         <div class="cau-cw-section">
@@ -240,10 +288,9 @@
           <div class="cau-cw-grid">
             <label><span>刷新间隔（秒）</span><input id="cau-cw-interval" type="number" min="3" max="120" step="0.5"></label>
             <label><span>随机抖动（毫秒）</span><input id="cau-cw-jitter" type="number" min="0" max="10000" step="100"></label>
-            <label><span>最低余量</span><input id="cau-cw-min-remaining" type="number" min="1" max="9999" step="1"></label>
-            <label><span>最多查询次数</span><input id="cau-cw-max-attempts" type="number" min="0" max="1000000" step="1" title="0 表示不限"></label>
-            <label style="grid-column: 1 / -1"><span>多班选择策略</span><select id="cau-cw-strategy"><option value="maxRemaining">剩余容量最多</option><option value="first">页面中的第一班</option></select></label>
+            <label style="grid-column: 1 / -1"><span>最多查询次数（全部课程合计）</span><input id="cau-cw-max-attempts" type="number" min="0" max="1000000" step="1" title="0 表示不限"></label>
           </div>
+          <p class="cau-cw-hint">多选模式的全部课程共用这里的刷新间隔；相邻两次查询之间都会等待该间隔并附加随机抖动。</p>
           <label class="cau-cw-check"><input id="cau-cw-show-full" type="checkbox"><span>查询时显示已满课程，便于观察余量变化</span></label>
           <label class="cau-cw-check"><input id="cau-cw-auto-confirm" type="checkbox"><span>自动点击本次选课流程中的所有“确定”弹窗（包括班级确认和课程组确认）</span></label>
           <label class="cau-cw-check"><input id="cau-cw-notify" type="checkbox"><span>成功、验证码或异常时发送桌面通知</span></label>
@@ -280,6 +327,10 @@
       start: panel.querySelector('#cau-cw-start'),
       pause: panel.querySelector('#cau-cw-pause'),
       arm: panel.querySelector('#cau-cw-arm'),
+      courseList: panel.querySelector('#cau-cw-course-list'),
+      addCourse: panel.querySelector('#cau-cw-add-course'),
+      modeTabs: [...panel.querySelectorAll('.cau-cw-mode-tab')],
+      targetHint: panel.querySelector('#cau-cw-target-hint'),
     };
 
     writeConfigToPanel(state.config);
@@ -292,19 +343,85 @@
     return document.getElementById(id);
   }
 
+  function courseBlockTemplate(index) {
+    return `
+      <div class="cau-cw-course-block" data-course-index="${index}">
+        <div class="cau-cw-course-head">
+          <b>待选课程 ${index + 1}</b>
+          <button class="cau-cw-small-btn cau-cw-remove" type="button" data-remove-course="${index}" title="删除这门课程">−</button>
+        </div>
+        <div class="cau-cw-grid">
+          <label style="grid-column: 1 / -1"><span>课程名称（必填）</span><input data-course-field="courseName" type="text" placeholder="例如：羽毛球"></label>
+          <label><span>名称匹配</span><select data-course-field="matchMode"><option value="exact">智能精确（推荐）</option><option value="contains">包含关键词</option></select></label>
+          <label><span>课程编号（可选）</span><input data-course-field="courseCode" type="text" placeholder="例如：70013084"></label>
+          <label><span>教师（可选）</span><input data-course-field="teacher" type="text" placeholder="包含匹配"></label>
+          <label><span>课序号（可选）</span><input data-course-field="classNumber" type="text" placeholder="例如：507"></label>
+          <label><span>校区（可选）</span><input data-course-field="campus" type="text" placeholder="例如：烟台研究院"></label>
+          <label><span>时间关键词（可选）</span><input data-course-field="timeKeyword" type="text" placeholder="例如：星期六 1-2节"></label>
+          <label><span>最低余量</span><input data-course-field="minRemaining" type="number" min="1" max="9999" step="1"></label>
+          <label><span>多班选择策略</span><select data-course-field="selectionStrategy"><option value="maxRemaining">剩余容量最多</option><option value="first">页面中的第一班</option></select></label>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCourseBlocks(courses) {
+    const cleanCourses = sanitizeConfig({ ...state.config, courses }).courses;
+    ui.courseList.innerHTML = cleanCourses.map((_, index) => courseBlockTemplate(index)).join('');
+    [...ui.courseList.querySelectorAll('.cau-cw-course-block')].forEach((block, index) => {
+      const course = cleanCourses[index];
+      Object.entries(course).forEach(([key, value]) => {
+        const input = block.querySelector(`[data-course-field="${key}"]`);
+        if (input) input.value = String(value);
+      });
+    });
+    updateCourseControls();
+  }
+
+  function readCourseBlocks() {
+    return [...ui.courseList.querySelectorAll('.cau-cw-course-block')].map((block) => ({
+      courseName: block.querySelector('[data-course-field="courseName"]').value,
+      matchMode: block.querySelector('[data-course-field="matchMode"]').value,
+      courseCode: block.querySelector('[data-course-field="courseCode"]').value,
+      teacher: block.querySelector('[data-course-field="teacher"]').value,
+      classNumber: block.querySelector('[data-course-field="classNumber"]').value,
+      campus: block.querySelector('[data-course-field="campus"]').value,
+      timeKeyword: block.querySelector('[data-course-field="timeKeyword"]').value,
+      minRemaining: block.querySelector('[data-course-field="minRemaining"]').value,
+      selectionStrategy: block.querySelector('[data-course-field="selectionStrategy"]').value,
+    }));
+  }
+
+  function updateCourseControls() {
+    if (!ui) return;
+    const mode = ui.panel.dataset.mode === 'multi' ? 'multi' : 'normal';
+    const blocks = [...ui.courseList.querySelectorAll('.cau-cw-course-block')];
+    ui.modeTabs.forEach((tab) => {
+      const active = tab.dataset.mode === mode;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', String(active));
+      tab.disabled = state.running || state.inFlight;
+    });
+    ui.addCourse.hidden = mode !== 'multi';
+    ui.addCourse.disabled = state.running || state.inFlight || blocks.length >= MAX_COURSES;
+    blocks.forEach((block, index) => {
+      block.hidden = mode === 'normal' && index > 0;
+      const remove = block.querySelector('[data-remove-course]');
+      remove.hidden = mode !== 'multi';
+      remove.disabled = state.running || state.inFlight || blocks.length <= 1;
+    });
+    ui.targetHint.textContent = mode === 'multi'
+      ? '可配置 1–4 门课程并按顺序交替查询；每门课程都可独立设置最低余量和多班策略。'
+      : '同名课程有多个班时，建议至少填写教师、课序号或时间；否则默认选择余量最多的班。';
+    field('cau-cw-query').textContent = mode === 'multi' ? '仅轮询一轮' : '仅查询一次';
+  }
+
   function writeConfigToPanel(config) {
-    field('cau-cw-course-name').value = config.courseName;
-    field('cau-cw-match-mode').value = config.matchMode;
-    field('cau-cw-course-code').value = config.courseCode;
-    field('cau-cw-teacher').value = config.teacher;
-    field('cau-cw-class-number').value = config.classNumber;
-    field('cau-cw-campus').value = config.campus;
-    field('cau-cw-time').value = config.timeKeyword;
+    ui.panel.dataset.mode = config.mode;
+    renderCourseBlocks(config.courses);
     field('cau-cw-interval').value = String(config.intervalMs / 1000);
     field('cau-cw-jitter').value = String(config.jitterMs);
-    field('cau-cw-min-remaining').value = String(config.minRemaining);
     field('cau-cw-max-attempts').value = String(config.maxAttempts);
-    field('cau-cw-strategy').value = config.selectionStrategy;
     field('cau-cw-show-full').checked = config.showFullCourses;
     field('cau-cw-auto-confirm').checked = config.autoConfirmAllPrompts;
     field('cau-cw-notify').checked = config.desktopNotification;
@@ -313,18 +430,11 @@
 
   function readConfigFromPanel() {
     return sanitizeConfig({
-      courseName: field('cau-cw-course-name').value,
-      matchMode: field('cau-cw-match-mode').value,
-      courseCode: field('cau-cw-course-code').value,
-      teacher: field('cau-cw-teacher').value,
-      classNumber: field('cau-cw-class-number').value,
-      campus: field('cau-cw-campus').value,
-      timeKeyword: field('cau-cw-time').value,
+      mode: ui.panel.dataset.mode,
+      courses: readCourseBlocks(),
       intervalMs: Number(field('cau-cw-interval').value) * 1000,
       jitterMs: field('cau-cw-jitter').value,
-      minRemaining: field('cau-cw-min-remaining').value,
       maxAttempts: field('cau-cw-max-attempts').value,
-      selectionStrategy: field('cau-cw-strategy').value,
       showFullCourses: field('cau-cw-show-full').checked,
       autoConfirmAllPrompts: field('cau-cw-auto-confirm').checked,
       desktopNotification: field('cau-cw-notify').checked,
@@ -336,6 +446,41 @@
     field('cau-cw-collapse').addEventListener('click', () => {
       ui.panel.classList.toggle('cau-cw-collapsed');
       field('cau-cw-collapse').textContent = ui.panel.classList.contains('cau-cw-collapsed') ? '+' : '—';
+    });
+
+    ui.modeTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        if (state.running || state.inFlight) return;
+        const config = readConfigFromPanel();
+        config.mode = tab.dataset.mode === 'multi' ? 'multi' : 'normal';
+        state.config = sanitizeConfig(config);
+        writeConfigToPanel(state.config);
+        log(`已切换到${state.config.mode === 'multi' ? '多选模式' : '正常模式'}。`);
+      });
+    });
+
+    ui.addCourse.addEventListener('click', () => {
+      if (state.running || state.inFlight) return;
+      const courses = readCourseBlocks();
+      if (courses.length >= MAX_COURSES) {
+        toast(`最多只能监控 ${MAX_COURSES} 门课程`, true);
+        return;
+      }
+      courses.push({ ...DEFAULT_COURSE });
+      renderCourseBlocks(courses);
+      log(`已增加待选课程块，当前共 ${courses.length} 门。`);
+    });
+
+    ui.courseList.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-remove-course]');
+      if (!button || state.running || state.inFlight) return;
+      const courses = readCourseBlocks();
+      if (courses.length <= 1) return;
+      const index = Number(button.dataset.removeCourse);
+      if (!Number.isInteger(index) || index < 0 || index >= courses.length) return;
+      const [removed] = courses.splice(index, 1);
+      renderCourseBlocks(courses);
+      log(`已删除${removed.courseName ? `“${removed.courseName}”` : `待选课程 ${index + 1}`}，当前共 ${courses.length} 门。`);
     });
 
     field('cau-cw-save').addEventListener('click', async () => {
@@ -366,7 +511,7 @@
     });
 
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && state.running) pauseMonitoring('已通过 Esc 紧急停止。');
+      if (event.key === 'Escape' && (state.running || state.inFlight)) pauseMonitoring('已通过 Esc 紧急停止。');
     }, true);
 
     document.addEventListener('visibilitychange', () => {
@@ -377,7 +522,10 @@
   }
 
   function validateConfig(config, requireAuthorization) {
-    if (!config.courseName) throw new Error('必须填写课程名称。');
+    const courses = activeCourseConfigs(config);
+    courses.forEach((course, index) => {
+      if (!course.courseName) throw new Error(`必须填写第 ${index + 1} 门课程的课程名称。`);
+    });
     if (config.intervalMs < 3000) throw new Error('刷新间隔不能低于 3 秒。');
     if (requireAuthorization && !ui.arm.checked) {
       throw new Error('开始自动监控前，请勾选“本次授权”。');
@@ -393,20 +541,56 @@
       const config = await saveConfig(readConfigFromPanel());
       writeConfigToPanel(config);
       validateConfig(config, false);
+      const courses = activeCourseConfigs(config);
+      state.stopRequested = false;
       state.inFlight = true;
       ensureAudioContext();
       const doc = await enterFreeCoursePage();
-      state.attempts += 1;
-      ui.attempts.textContent = `${state.attempts} 次`;
-      const rows = await performQuery(doc, config);
-      state.lastRows = rows;
-      renderQuerySummary(rows, config);
+      ui.runState.textContent = courses.length > 1 ? '单轮查询' : '查询中';
+      ui.runState.className = 'cau-cw-running';
+      updateButtons();
+      for (let index = 0; index < courses.length; index += 1) {
+        if (index > 0 && !(await waitForSharedInterval(config))) break;
+        if (state.stopRequested) break;
+        const courseConfig = courses[index];
+        state.attempts += 1;
+        ui.attempts.textContent = `${state.attempts} 次`;
+        ui.next.textContent = '查询中';
+        ui.result.textContent = `正在查询 ${targetLabel(courseConfig)}`;
+        const rows = await performQuery(doc, courseConfig);
+        state.lastRows = rows;
+        renderQuerySummary(rows, courseConfig);
+      }
+      if (!state.stopRequested && courses.length > 1) log(`已完成 ${courses.length} 门课程的单轮查询。`, 'success');
     } catch (error) {
       handleFatal(error, '单次查询失败', false);
     } finally {
+      clearInterval(state.countdownTimer);
+      state.countdownTimer = null;
+      state.nextRunAt = 0;
       state.inFlight = false;
+      state.stopRequested = false;
+      ui.runState.textContent = '已停止';
+      ui.runState.className = 'cau-cw-paused';
+      ui.next.textContent = '—';
       updateButtons();
     }
+  }
+
+  async function waitForSharedInterval(config) {
+    const jitter = Math.floor(Math.random() * (config.jitterMs + 1));
+    state.nextRunAt = Date.now() + config.intervalMs + jitter;
+    updateCountdown();
+    clearInterval(state.countdownTimer);
+    state.countdownTimer = setInterval(updateCountdown, 250);
+    while (Date.now() < state.nextRunAt) {
+      if (state.stopRequested) return false;
+      await sleep(Math.min(150, Math.max(20, state.nextRunAt - Date.now())));
+    }
+    clearInterval(state.countdownTimer);
+    state.countdownTimer = null;
+    state.nextRunAt = 0;
+    return !state.stopRequested;
   }
 
   async function startMonitoring() {
@@ -420,10 +604,13 @@
       state.attempts = 0;
       state.consecutiveErrors = 0;
       state.transientFailures = 0;
+      state.courseIndex = 0;
+      state.stopRequested = false;
       ui.runState.textContent = '运行中';
       ui.runState.className = 'cau-cw-running';
       ui.result.textContent = '等待首次查询';
-      log(`开始监控“${config.courseName}”，基础间隔 ${formatSeconds(config.intervalMs)}。`, 'success');
+      const courses = activeCourseConfigs(config);
+      log(`开始${config.mode === 'multi' ? `轮询 ${courses.length} 门课程：${courses.map((course) => `“${course.courseName}”`).join('、')}` : `监控“${courses[0].courseName}”`}，共享基础间隔 ${formatSeconds(config.intervalMs)}。`, 'success');
       updateButtons();
       scheduleNext(0);
     } catch (error) {
@@ -433,6 +620,7 @@
   }
 
   function pauseMonitoring(reason, options = {}) {
+    state.stopRequested = true;
     clearTimeout(state.timer);
     clearInterval(state.countdownTimer);
     state.timer = null;
@@ -451,8 +639,9 @@
   function updateButtons() {
     if (!ui) return;
     ui.start.disabled = state.running || state.inFlight;
-    ui.pause.disabled = !state.running;
+    ui.pause.disabled = (!state.running && !state.inFlight) || state.stopRequested;
     field('cau-cw-query').disabled = state.running || state.inFlight;
+    updateCourseControls();
   }
 
   function scheduleNext(delayOverride = null) {
@@ -474,7 +663,7 @@
   }
 
   function updateCountdown() {
-    if (!state.running || !state.nextRunAt) {
+    if ((!state.running && !state.inFlight) || !state.nextRunAt) {
       if (ui) ui.next.textContent = '—';
       return;
     }
@@ -483,7 +672,7 @@
   }
 
   async function tick() {
-    if (!state.running || state.inFlight) return;
+    if (!state.running || state.inFlight || state.stopRequested) return;
     if (state.config.maxAttempts > 0 && state.attempts >= state.config.maxAttempts) {
       pauseMonitoring(`已达到最多查询次数（${state.config.maxAttempts}），监控停止。`);
       return;
@@ -495,16 +684,23 @@
     ui.next.textContent = '查询中';
     updateButtons();
 
+    const courses = activeCourseConfigs(state.config);
+    if (state.courseIndex >= courses.length) state.courseIndex = 0;
+    const courseConfig = courses[state.courseIndex];
+
     try {
       const doc = await enterFreeCoursePage();
-      const rows = await performQuery(doc, state.config);
+      ui.result.textContent = `正在查询 ${targetLabel(courseConfig)}`;
+      const rows = await performQuery(doc, courseConfig);
       state.lastRows = rows;
       state.consecutiveErrors = 0;
-      renderQuerySummary(rows, state.config);
+      renderQuerySummary(rows, courseConfig);
+      if (!state.running || state.stopRequested) return;
 
-      const eligible = chooseEligibleRows(rows, state.config);
+      const eligible = chooseEligibleRows(rows, courseConfig);
       if (!eligible.length) {
         state.transientFailures = 0;
+        advanceCourseIndex();
         scheduleNext();
         return;
       }
@@ -512,9 +708,9 @@
       const target = eligible[0];
       const descriptor = describeRow(target);
       if (eligible.length > 1) {
-        log(`发现 ${eligible.length} 个有余量的匹配班级，将按“${strategyLabel(state.config.selectionStrategy)}”选择：${descriptor}`);
+        log(`${targetLabel(courseConfig)}：发现 ${eligible.length} 个有余量的匹配班级，将按“${strategyLabel(courseConfig.selectionStrategy)}”选择：${descriptor}`);
       } else {
-        log(`发现余量，准备选择：${descriptor}`, 'success');
+        log(`${targetLabel(courseConfig)}：发现余量，准备选择：${descriptor}`, 'success');
       }
 
       if (isAlreadySelected(target)) {
@@ -525,6 +721,7 @@
       const result = await selectCourse(target);
       if (result === 'retry') {
         state.transientFailures += 1;
+        advanceCourseIndex();
         scheduleNext();
       }
     } catch (error) {
@@ -536,12 +733,18 @@
         handleFatal(error, '连续 5 次查询异常，已为保护账号而暂停');
       } else {
         ui.result.textContent = `异常 ${state.consecutiveErrors} 次`;
+        advanceCourseIndex();
         scheduleNext();
       }
     } finally {
       state.inFlight = false;
       updateButtons();
     }
+  }
+
+  function advanceCourseIndex() {
+    const count = activeCourseConfigs(state.config).length;
+    state.courseIndex = count > 0 ? (state.courseIndex + 1) % count : 0;
   }
 
   function getMainFrame() {
@@ -661,7 +864,7 @@
     }, 15000, 120);
 
     const rows = parseCourseRows(doc);
-    log(`第 ${state.attempts || 1} 次查询完成：返回 ${rows.length} 个班级。`);
+    log(`第 ${state.attempts || 1} 次查询完成：${targetLabel(config)}，返回 ${rows.length} 个班级。`);
     return rows;
   }
 
@@ -746,18 +949,19 @@
 
   function renderQuerySummary(rows, config) {
     const matches = matchingRows(rows, config);
+    const prefix = activeCourseConfigs(state.config).length > 1 ? `第 ${config.targetIndex + 1} 门：` : '';
     if (!matches.length) {
-      ui.result.textContent = '没有匹配课程';
-      log('本次没有找到符合全部条件的课程。');
+      ui.result.textContent = `${prefix}没有匹配课程`;
+      log(`${targetLabel(config)}：本次没有找到符合全部条件的课程。`);
       return;
     }
     const available = matches.filter((row) => Number.isFinite(row.remaining) && row.remaining >= config.minRemaining && row.selectLink);
     if (available.length) {
       const max = Math.max(...available.map((row) => row.remaining));
-      ui.result.textContent = `${available.length} 班有余量（最多 ${max}）`;
+      ui.result.textContent = `${prefix}${available.length} 班有余量（最多 ${max}）`;
     } else {
       const capacities = matches.map((row) => row.remainingText || '?').join(', ');
-      ui.result.textContent = `${matches.length} 班匹配，余量 ${capacities}`;
+      ui.result.textContent = `${prefix}${matches.length} 班匹配，余量 ${capacities}`;
     }
   }
 
@@ -997,7 +1201,7 @@
       state.config = await loadConfig();
     } catch (error) {
       console.warn('[CAU Course Watcher] 配置载入失败，将使用默认值。', error);
-      state.config = { ...DEFAULT_CONFIG };
+      state.config = sanitizeConfig(DEFAULT_CONFIG);
     }
     createPanel();
     setInterval(updatePageStatus, 2500);

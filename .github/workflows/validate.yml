@@ -30,4 +30,6 @@ jobs:
         run: node -e "JSON.parse(require('node:fs').readFileSync('chrome-extension/manifest.json', 'utf8'))"
 
       - name: Run smoke test
-        run: node tests/background-smoke.test.cjs
+        run: |
+          node tests/background-smoke.test.cjs
+          node tests/multi-mode.test.cjs
