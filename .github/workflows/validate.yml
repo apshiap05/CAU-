@@ -35,3 +35,8 @@ jobs:
           node tests/multi-mode.test.cjs
           node tests/panel-layout.test.cjs
           node tests/release-version.test.cjs
+
+      - name: Verify mode-dependent panel rendering
+        run: |
+          google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=1000 --dump-dom "file://$PWD/tests/panel-preview.html?mode=normal" | node tests/panel-render.test.cjs normal
+          google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=1000 --dump-dom "file://$PWD/tests/panel-preview.html?mode=multi" | node tests/panel-render.test.cjs multi

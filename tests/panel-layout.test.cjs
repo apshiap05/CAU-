@@ -17,6 +17,8 @@ for (const [name, file] of sources) {
   assert.match(source, /\.cau-cw-add-btn[\s\S]*?border-radius: 999px;/, `${name} 的添加课程按钮应为胶囊形状`);
   assert.match(source, /\.cau-cw-add-btn:hover:not\(:disabled\)/, `${name} 应提供悬停反馈`);
   assert.match(source, /\.cau-cw-add-btn:focus-visible/, `${name} 应提供键盘焦点反馈`);
+  assert.match(source, /#\$\{SCRIPT_ID\}-panel \[hidden\] \{ display: none !important; \}/, `${name} 必须保证 hidden 属性不会被组件 display 样式覆盖`);
+  assert.match(source, /ui\.addCourse\.hidden = controls\.addHidden;/, `${name} 的添加按钮可见性必须由模式状态统一控制`);
   assert.match(source, /最多可配置.*MAX_COURSES.*门课程/, `${name} 应在达到上限时说明原因`);
   assert.doesNotMatch(source, /id="cau-cw-add-course" class="cau-cw-small-btn"/, `${name} 不应继续复用方形删除按钮样式`);
 }

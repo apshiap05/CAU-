@@ -14,7 +14,7 @@ function loadTestApi(sourcePath) {
   const source = fs.readFileSync(sourcePath, 'utf8');
   const instrumented = source.replace(
     /\n\s*init\(\);\s*\n\}\)\(\);\s*$/,
-    '\n  globalThis.__multiModeTest = { DEFAULT_CONFIG, sanitizeConfig, activeCourseConfigs, advanceCourseIndex, state };\n})();',
+    '\n  globalThis.__multiModeTest = { DEFAULT_CONFIG, sanitizeConfig, activeCourseConfigs, getCourseControlState, advanceCourseIndex, state };\n})();',
   );
   assert.notEqual(instrumented, source, `无法挂载测试接口：${sourcePath}`);
   const context = vm.createContext({
@@ -70,6 +70,32 @@ for (const sourcePath of sources) {
 
   const normal = api.sanitizeConfig({ ...multi, mode: 'normal' });
   assert.equal(api.activeCourseConfigs(normal).length, 1, '正常模式只能启用第一门课程');
+
+  const normalControls = api.getCourseControlState('normal', 4, false);
+  assert.equal(normalControls.visibleCourseCount, 1, '正常模式只能显示第一门课程');
+  assert.equal(normalControls.addHidden, true, '正常模式必须隐藏添加课程按钮');
+  assert.equal(normalControls.removeHidden, true, '正常模式必须隐藏删除课程按钮');
+  assert.equal(normalControls.queryLabel, '仅查询一次');
+
+  const oneCourseControls = api.getCourseControlState('multi', 1, false);
+  assert.equal(oneCourseControls.addHidden, false, '多选模式必须显示添加课程按钮');
+  assert.equal(oneCourseControls.addDisabled, false, '少于四门课程时应允许添加');
+  assert.equal(oneCourseControls.removeDisabled, true, '只有一门课程时不能删除');
+
+  const twoCourseControls = api.getCourseControlState('multi', 2, false);
+  assert.equal(twoCourseControls.visibleCourseCount, 2);
+  assert.equal(twoCourseControls.addDisabled, false);
+  assert.equal(twoCourseControls.removeDisabled, false, '多于一门课程时应允许删除');
+  assert.equal(twoCourseControls.queryLabel, '仅轮询一轮');
+
+  const maxCourseControls = api.getCourseControlState('multi', 4, false);
+  assert.equal(maxCourseControls.addDisabled, true, '达到四门课程上限时不能继续添加');
+  assert.equal(maxCourseControls.removeDisabled, false);
+
+  const busyControls = api.getCourseControlState('multi', 2, true);
+  assert.equal(busyControls.tabsDisabled, true, '查询或监控时不能切换模式');
+  assert.equal(busyControls.addDisabled, true, '查询或监控时不能添加课程');
+  assert.equal(busyControls.removeDisabled, true, '查询或监控时不能删除课程');
   assert.match(fs.readFileSync(sourcePath, 'utf8'), /data-remove-course/);
 }
 

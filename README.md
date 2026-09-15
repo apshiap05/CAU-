@@ -11,8 +11,8 @@
 
 | 版本 | 适合场景 |
 | --- | --- |
-| Chrome 扩展 v1.3.1 | 只使用 Google Chrome，希望不依赖 Tampermonkey |
-| Tampermonkey 脚本 v1.3.1 | 使用 Chrome、Edge、Firefox，或已经安装 Tampermonkey |
+| Chrome 扩展 v1.3.2 | 只使用 Google Chrome，希望不依赖 Tampermonkey |
+| Tampermonkey 脚本 v1.3.2 | 使用 Chrome、Edge、Firefox，或已经安装 Tampermonkey |
 
 两个版本具备相同的核心能力。
 
@@ -21,7 +21,7 @@
 
 配置面板最上方提供两个选项卡：
 
-- **正常模式**：保持原有行为，只查询和监控一门课程。
+- **正常模式**：保持原有行为，只显示、查询和监控一门课程，不显示添加或删除课程按钮。
 - **多选模式**：使用标题栏右侧的“＋ 添加课程”增加待选课程块、使用“−”删除多余课程，最少 1 门、最多 4 门。每门课程均可独立填写课程名称、匹配方式、课程编号、教师、课序号、校区、时间关键词、最低余量和多班选择策略。
 
 多选监控按 `课程 1 → 课程 2 → 课程 3 → 课程 4 → 课程 1` 循环。程序每次只把当前课程名写入教务页面并点击一次“查询”，等待共享刷新间隔和随机抖动后再查询下一门。任何一门发现符合条件的余量都会立即进入原生选课流程；选课成功后整个监控停止。
@@ -34,7 +34,7 @@
 
 ### Google Chrome 扩展
 
-使用“加载已解压的扩展程序”，或从 [最新 Release](https://github.com/apshiap05/CAU-/releases/latest) 下载与当前版本对应的压缩包。下载后请确认 `manifest.json` 的版本为 `1.3.1`；旧 Release 不会自动包含 `main` 分支的后续更新。
+使用“加载已解压的扩展程序”，或从 [最新 Release](https://github.com/apshiap05/CAU-/releases/latest) 下载与当前版本对应的压缩包。下载后请确认 `manifest.json` 的版本为 `1.3.2`；旧 Release 不会自动包含 `main` 分支的后续更新。
 
 ### Tampermonkey 脚本
 

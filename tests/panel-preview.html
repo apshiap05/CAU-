@@ -8,12 +8,13 @@
       .mock-page { margin: 125px 500px 0 25px; padding: 24px; border: 1px solid #cad7ce; background: white; color: #526158; }
     </style>
     <script>
+      const previewMode = new URLSearchParams(window.location.search).get('mode') === 'normal' ? 'normal' : 'multi';
       window.chrome = window.chrome || {};
       window.chrome.storage = {
         local: {
           get: async () => ({
             'cau-course-watcher:chrome-config:v1': {
-              mode: 'multi',
+              mode: previewMode,
               courses: [
                 { courseName: '羽毛球', teacher: '田野', minRemaining: 1, selectionStrategy: 'maxRemaining' },
                 { courseName: '专业英语', teacher: '郝彦菊', minRemaining: 1, selectionStrategy: 'first' }
@@ -38,5 +39,19 @@
       <p>本文件只用于检查扩展配置面板布局，不会访问教务系统或执行查询。</p>
     </div>
     <script src="../chrome-extension/content.js"></script>
+    <script>
+      setTimeout(() => {
+        const panel = document.querySelector('#cau-course-watcher-panel');
+        const addButton = document.querySelector('#cau-cw-add-course');
+        const removeButtons = [...document.querySelectorAll('[data-remove-course]')];
+        const courseBlocks = [...document.querySelectorAll('.cau-cw-course-block')];
+        const visible = (element) => getComputedStyle(element).display !== 'none';
+        document.body.dataset.cauPanelReady = String(Boolean(panel));
+        document.body.dataset.cauActiveMode = panel?.dataset.mode || 'missing';
+        document.body.dataset.cauAddVisible = String(Boolean(addButton && visible(addButton)));
+        document.body.dataset.cauVisibleCourseCount = String(courseBlocks.filter(visible).length);
+        document.body.dataset.cauVisibleRemoveCount = String(removeButtons.filter(visible).length);
+      }, 250);
+    </script>
   </body>
 </html>

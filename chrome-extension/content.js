@@ -114,6 +114,22 @@
     return courses.map((course, targetIndex) => ({ ...config, ...course, targetIndex }));
   }
 
+  function getCourseControlState(mode, courseCount, busy) {
+    const isMulti = mode === 'multi';
+    const count = Math.max(1, Math.min(MAX_COURSES, Number(courseCount) || 1));
+    const isBusy = Boolean(busy);
+    return {
+      isMulti,
+      visibleCourseCount: isMulti ? count : 1,
+      tabsDisabled: isBusy,
+      addHidden: !isMulti,
+      addDisabled: isBusy || count >= MAX_COURSES,
+      removeHidden: !isMulti,
+      removeDisabled: isBusy || count <= 1,
+      queryLabel: isMulti ? '仅轮询一轮' : '仅查询一次',
+    };
+  }
+
   function targetLabel(config) {
     const total = activeCourseConfigs(state.config).length;
     return total > 1 ? `课程 ${config.targetIndex + 1}/${total}“${config.courseName}”` : `“${config.courseName}”`;
@@ -155,6 +171,7 @@
     style.id = `${SCRIPT_ID}-style`;
     style.textContent = `
       #${SCRIPT_ID}-panel, #${SCRIPT_ID}-panel * { box-sizing: border-box; }
+      #${SCRIPT_ID}-panel [hidden] { display: none !important; }
       #${SCRIPT_ID}-panel {
         position: fixed; top: 18px; right: 18px; z-index: 2147483646;
         width: 440px; max-height: calc(100vh - 36px); overflow: auto;
@@ -280,7 +297,7 @@
     panel.id = `${SCRIPT_ID}-panel`;
     panel.innerHTML = `
       <div class="cau-cw-header">
-        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.3.1</small></div>
+        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.3.2</small></div>
         <span id="cau-cw-run-state" class="cau-cw-paused">已停止</span>
         <button id="cau-cw-collapse" class="cau-cw-icon-btn" title="收起/展开">—</button>
       </div>
@@ -420,28 +437,28 @@
     if (!ui) return;
     const mode = ui.panel.dataset.mode === 'multi' ? 'multi' : 'normal';
     const blocks = [...ui.courseList.querySelectorAll('.cau-cw-course-block')];
+    const controls = getCourseControlState(mode, blocks.length, state.running || state.inFlight);
     ui.modeTabs.forEach((tab) => {
       const active = tab.dataset.mode === mode;
       tab.classList.toggle('active', active);
       tab.setAttribute('aria-selected', String(active));
-      tab.disabled = state.running || state.inFlight;
+      tab.disabled = controls.tabsDisabled;
     });
-    const courseLimitReached = blocks.length >= MAX_COURSES;
-    ui.addCourse.hidden = mode !== 'multi';
-    ui.addCourse.disabled = state.running || state.inFlight || courseLimitReached;
-    const addCourseDescription = courseLimitReached ? `最多可配置 ${MAX_COURSES} 门课程` : '增加待选课程';
+    ui.addCourse.hidden = controls.addHidden;
+    ui.addCourse.disabled = controls.addDisabled;
+    const addCourseDescription = blocks.length >= MAX_COURSES ? `最多可配置 ${MAX_COURSES} 门课程` : '增加待选课程';
     ui.addCourse.title = addCourseDescription;
     ui.addCourse.setAttribute('aria-label', addCourseDescription);
     blocks.forEach((block, index) => {
-      block.hidden = mode === 'normal' && index > 0;
+      block.hidden = index >= controls.visibleCourseCount;
       const remove = block.querySelector('[data-remove-course]');
-      remove.hidden = mode !== 'multi';
-      remove.disabled = state.running || state.inFlight || blocks.length <= 1;
+      remove.hidden = controls.removeHidden;
+      remove.disabled = controls.removeDisabled;
     });
-    ui.targetHint.textContent = mode === 'multi'
+    ui.targetHint.textContent = controls.isMulti
       ? '可配置 1–4 门课程并按顺序交替查询；每门课程都可独立设置最低余量和多班策略。'
       : '同名课程有多个班时，建议至少填写教师、课序号或时间；否则默认选择余量最多的班。';
-    field('cau-cw-query').textContent = mode === 'multi' ? '仅轮询一轮' : '仅查询一次';
+    field('cau-cw-query').textContent = controls.queryLabel;
   }
 
   function writeConfigToPanel(config) {
