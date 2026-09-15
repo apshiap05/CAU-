@@ -258,7 +258,7 @@
     panel.id = `${SCRIPT_ID}-panel`;
     panel.innerHTML = `
       <div class="cau-cw-header">
-        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.1.0</small></div>
+        <div class="cau-cw-title">选课余量监控助手 <small style="font-weight:500;opacity:.78">Chrome v1.3.0</small></div>
         <span id="cau-cw-run-state" class="cau-cw-paused">已停止</span>
         <button id="cau-cw-collapse" class="cau-cw-icon-btn" title="收起/展开">—</button>
       </div>

@@ -11,7 +11,7 @@
 
 | 版本 | 适合场景 |
 | --- | --- |
-| Chrome 扩展 v1.1.0 | 只使用 Google Chrome，希望不依赖 Tampermonkey |
+| Chrome 扩展 v1.3.0 | 只使用 Google Chrome，希望不依赖 Tampermonkey |
 | Tampermonkey 脚本 v1.3.0 | 使用 Chrome、Edge、Firefox，或已经安装 Tampermonkey |
 
 两个版本具备相同的核心能力。
@@ -34,7 +34,7 @@
 
 ### Google Chrome 扩展
 
-使用“加载已解压的扩展程序”，或使用 Releases 中与当前版本对应的压缩包。下载 Release 后请确认 `manifest.json` 的版本为 `1.1.0`；旧 Release 不会自动包含 `main` 分支的后续更新。
+使用“加载已解压的扩展程序”，或从 [最新 Release](https://github.com/apshiap05/CAU-/releases/latest) 下载与当前版本对应的压缩包。下载后请确认 `manifest.json` 的版本为 `1.3.0`；旧 Release 不会自动包含 `main` 分支的后续更新。
 
 ### Tampermonkey 脚本
 
@@ -80,6 +80,8 @@
 │  └─ README.md
 ├─ tests/                           # 多选轮询、弹窗链和面板预览测试
 ├─ .github/workflows/validate.yml   # JavaScript 与 Manifest 自动校验
+├─ CHANGELOG.md                     # 版本变化记录
+├─ RELEASING.md                     # 固定发布流程
 ├─ LICENSE
 └─ README.md
 ```
