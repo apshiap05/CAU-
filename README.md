@@ -34,7 +34,7 @@
 
 ### Google Chrome 扩展
 
-使用“加载已解压的扩展程序”或直接使用releases中的压缩包。
+使用“加载已解压的扩展程序”，或使用 Releases 中与当前版本对应的压缩包。下载 Release 后请确认 `manifest.json` 的版本为 `1.1.0`；旧 Release 不会自动包含 `main` 分支的后续更新。
 
 ### Tampermonkey 脚本
 
